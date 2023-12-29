@@ -1,0 +1,201 @@
+
+<!DOCTYPE html >
+<html xmlns="http://www.w3.org/1999/xhtml">
+{% load static %}
+
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=emulateIE7" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>lcv-search 搜索引擎</title>
+<link href="{% static 'css/style.css'%}" rel="stylesheet" type="text/css" />
+<link href="{% static 'css/index.css'%}" rel="stylesheet" type="text/css" />
+</head>
+<body>
+{#容器 纵向布局#}
+<div id="container">
+{#主体信息 纵向布局#}
+	<div id="bd">
+        <div id="main">
+
+{# 图标 #}
+        	<h1 class="title">
+            	<div class="logo large"></div>
+            </h1>
+{# 标签 data-type 自定义属性 #}
+            <div class="nav ue-clear">
+            	<ul class="searchList">
+                    <li class="searchItem current" data-type="article">文章</li>
+                    <li class="searchItem" data-type="question">问答</li>
+                    <li class="searchItem" data-type="job">职位</li>
+                </ul>
+            </div>
+{# 搜索输入框 #}
+            <div class="inputArea">
+            	<input type="text" class="searchInput" />
+                <input type="button" class="searchButton" onclick="add_search()" />
+{# 搜索建议列表 #}
+                <ul class="dataList">
+                </ul>
+            </div>
+
+{# 搜索建议 #}
+            <div class="historyArea">
+{# 热门搜索 #}
+            	<p class="history">
+                	<label>热门搜索：</label>
+                    {% for search_word in search_words %}
+                        <a href="/search?q={{ search_word }}">{{ search_word }}</a>
+                    {% endfor %}
+                </p>
+{# 我的搜索历史 #}
+                <p class="history mysearch">
+                	<label>我的搜索：</label>
+                    <span class="all-search">
+                    </span>
+
+                </p>
+            </div>
+        </div><!-- End of main -->
+    </div><!--End of bd-->
+
+{# 页脚 #}
+    <div class="foot">
+    	<div class="wrap">
+            <div class="copyright">Copyright &copy;uimaker.com 版权所有  E-mail:admin@uimaker.com</div>
+        </div>
+    </div>
+</div>
+
+</body>
+<script type="text/javascript" src="{% static 'js/jquery.js'%}"></script>
+<script type="text/javascript" src="{% static 'js/global.js'%}"></script>
+<script type="text/javascript">
+{# 搜索建议url #}
+    var suggest_url = "{% url "suggest" %}"
+{# 搜索 #}
+    var search_url = "{% url "search" %}"
+
+{# 点击标签栏切换事件监听->修改当前选中标签 #}
+	$('.searchList').on('click', '.searchItem', function(){
+		$('.searchList .searchItem').removeClass('current');
+		$(this).addClass('current');
+	});
+
+{# 移除数组里制定值的元素#}
+    function removeByValue(arr, val) {
+      for(var i=0; i<arr.length; i++) {
+        if(arr[i] == val) {
+          arr.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+
+{# 搜索建议 #}
+    $(function(){
+{# 搜索输入框绑定输入值改变监听事件 #}
+        $('.searchInput').bind(' input propertychange ',function(){
+{# 获取当前输入框的值 #}
+            var searchText = $(this).val();
+{# $(".searchItem.current").attr('data-type') 获取选项卡当前选中选项的自定义data-type属性 #}
+            var search_type = $(".searchItem.current").attr('data-type');
+{# 定义搜索建议html结构体 #}
+            var tmpHtml = ""
+{# 执行ajax异步请求 #}
+            $.ajax({
+                cache: false,
+                type: 'get',
+                dataType:'json',
+                url:suggest_url+"?s="+searchText+"&s_type="+search_type,
+                async: true,
+{# 成功回调函数 #}
+                success: function(data) {
+{# 拼接返回结果字符串成搜索建议html结构体#}
+                    for (var i=0;i<data.length;i++){
+                        tmpHtml += '<li><a href="'+search_url+'?q='+data[i]+'&s_type='+search_type+'">'+data[i]+'</a></li>'
+                    }
+{# 清空原搜索建议列表信息 #}
+                    $(".dataList").html("");
+{# 设置新搜索建议列表信息 #}
+                    $(".dataList").append(tmpHtml);
+{# 如果返回结果集条数为0，则隐藏搜索建议，否则显示 #}
+                    if (data.length == 0){
+                        $('.dataList').hide()
+                    }else {
+                        $('.dataList').show()
+                    }
+                }
+            });
+        } );
+    })
+
+    hideElement($('.dataList'), $('.searchInput'));
+
+</script>
+<script>
+    var searchArr;
+{# 定义一个search的，判断浏览器有无数据存储（搜索历史）#}
+    if(localStorage.search){
+{# 如果有，转换成 数组的形式存放到searchArr的数组里（localStorage以字符串的形式存储，所以要把它转换成数组的形式）#}
+        searchArr= localStorage.search.split(",")
+    }else{
+{# 如果没有，则定义searchArr为一个空的数组 #}
+        searchArr = [];
+    }
+{# 把存储的数据显示出来作为搜索历史 #}
+    MapSearchArr();
+
+{# 点击搜索按钮监听事件（添加本地缓存并访问后台搜索接口） #}
+    function add_search(){
+{# 获取搜索框的值 #}
+        var val = $(".searchInput").val();
+        if (val.length>=2){
+{# 点击搜索按钮时，去重 #}
+            KillRepeat(val);
+{# 去重后把数组存储到浏览器localStorage #}
+            localStorage.search = searchArr;
+{# 然后再把搜索内容显示出来 #}
+            MapSearchArr();
+        }
+        window.location.href=search_url+'?q='+val+"&s_type="+$(".searchItem.current").attr('data-type')
+    }
+
+{# 将本地缓存的值显示出来 #}
+    function MapSearchArr(){
+{# 定义本地缓存html结构体 #}
+        var tmpHtml = "";
+{# 数组大小，控制最大为5（最多只显示最近的5条搜索记录） #}
+        var arrLen = 0
+        if (searchArr.length >= 5){
+            arrLen = 5
+        }else {
+            arrLen = searchArr.length
+        }
+{# 拼接本地缓存html #}
+        for (var i=0;i<arrLen;i++){
+            tmpHtml += '<a href="'+search_url+'?q='+searchArr[i]+'">'+searchArr[i]+'</a>'
+        }
+{# 渲染到页面元素 #}
+        $(".mysearch .all-search").html(tmpHtml);
+    }
+{# 本地搜索缓存去重 #}
+    function KillRepeat(val){
+        var kill = 0;
+        for (var i=0;i<searchArr.length;i++){
+            if(val===searchArr[i]){
+                kill ++;
+            }
+        }
+        if(kill<1){
+{# unshift() 方法可向数组的开头添加一个或更多元素，并返回新的长度。#}
+            searchArr.unshift(val);
+        }else {
+            removeByValue(searchArr, val)
+            searchArr.unshift(val)
+        }
+    }
+
+
+</script>
+</html>

@@ -1,0 +1,324 @@
+
+<!DOCTYPE html >
+<html xmlns="http://www.w3.org/1999/xhtml">
+{% load static %}
+<head>
+<meta http-equiv="X-UA-Compatible" content="IE=emulateIE7" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>python-lcv-search搜索引擎</title>
+<link href="{% static 'css/style.css' %}" rel="stylesheet" type="text/css" />
+<link href="{% static 'css/result.css' %}" rel="stylesheet" type="text/css" />
+</head>
+<body>
+{# 容器 纵向布局 #}
+<div id="container">
+{# 搜索框 横向布局 #}
+	<div id="hd" class="ue-clear">
+{# logo 点击跳转首页 #}
+    	<a href="/"><div class="logo"></div></a>
+{# 输入框及搜索按钮 横向布局 #}
+        <div class="inputArea">
+{# 输入框 #}
+        	<input type="text" class="searchInput" value="{{ key_words }}"/>
+{# 搜索建议 #}
+            <ul class="dataList" ></ul>
+{# 点击按钮 #}
+            <input type="button" class="searchButton" onclick="add_search()"/>
+        </div>
+    </div>
+{# 标签栏 #}
+    <div class="nav">
+    	<ul class="searchList">
+            <li class="searchItem current" data-type="article">文章</li>
+            <li class="searchItem" data-type="question">问答</li>
+            <li class="searchItem" data-type="job">职位</li>
+        </ul>
+    </div>
+{# 搜索结构主题内容 横向布局 #}
+	<div id="bd" class="ue-clear">
+        <div id="main">
+{# 存储记录条数汇总#}
+        	<div class="sideBar">
+
+                <div class="subfield">网站</div>
+                <ul class="subfieldContext">
+                	<li>
+                    	<span class="name">博客园</span>
+						<span class="unit">({{ cnblog_nums }})</span>
+                    </li>
+                    <li>
+                    	<span class="name">知乎</span>
+						<span class="unit">({{ zhihu_count }})</span>
+                    </li>
+                    <li>
+                    	<span class="name">拉勾网</span>
+						<span class="unit">({{ lagou_count }})</span>
+                    </li>
+{#                    <li class="more">#}
+{#                    	<a href="javascript:;">#}
+{#                        	<span class="text">更多</span>#}
+{#                        	<i class="moreIcon"></i>#}
+{#                        </a>#}
+{#                    </li>#}
+                </ul>
+
+
+                <div class="sideBarShowHide">
+                	<a href="javascript:;" class="icon"></a>
+                </div>
+            </div>
+{# 查询结果分页列表 #}
+            <div class="resultArea">
+{# 搜索时间 #}
+            	<p class="resultTotal">
+                	<span class="info">找到约&nbsp;<span class="totalResult">{{ total_nums }}</span>&nbsp;条结果(用时<span class="time">{{ uesd_time }}</span>秒)，共约<span class="totalPage">{{ page_nums }}</span>页</span>
+                </p>
+{# 结果列表循环遍历 #}
+                <div class="resultList">
+                    {% for hit in all_hits %}
+                    <div class="resultItem">
+                            <div class="itemHead">
+                                <a href="{{ hit.url }}"  target="_blank" class="title">{% autoescape off %}{{ hit.title }}{% endautoescape %}</a>
+                                <span class="divsion">-</span>
+                                <span class="fileType">
+                                    <span class="label">来源：</span>
+                                    <span class="value">博客园</span>
+                                </span>
+                                <span class="dependValue">
+                                    <span class="label">得分：</span>
+                                    <span class="value">{{ hit.score }}</span>
+                                </span>
+                            </div>
+                            <div class="itemBody">
+                                {% autoescape off %}{{ hit.main_content }}{% endautoescape %}
+                            </div>
+                            <div class="itemFoot">
+                                <span class="info">
+                                    <label>网站：</label>
+{# TODO 得改成动态加载 #}
+                                    <span class="value">博客园</span>
+                                </span>
+                                <span class="info">
+                                    <label>发布时间：</label>
+                                    <span class="value">{{ hit.date }}</span>
+                                </span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+{# 分页 #}
+                <div class="pagination ue-clear"></div>
+            </div>
+{# 相关搜索 #}
+            <div class="historyArea">
+{# 热门搜索 #}
+            	<div class="hotSearch">
+                	<h6>热门搜索</h6>
+                        {% for search_word in search_words %}
+                            <li><a href="/search?q={{ search_word }}">{{ search_word }}</a></li>
+                        {% endfor %}
+                </div>
+{# 我的搜索 #}
+                <div class="mysearch">
+                	<h6>我的搜索</h6>
+                   <span class="all-search">
+                    </span>
+                </div>
+            </div>
+        </div><!-- End of main -->
+    </div><!--End of bd-->
+</div>
+
+{# 页脚 #}
+<div id="foot">Copyright &copy;projectsedu.com 版权所有  E-mail:admin@projectsedu.com</div>
+</body>
+<script type="text/javascript" src="{% static 'js/jquery.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/global.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/pagination.js' %}"></script>
+
+<script type="text/javascript">
+{# 搜索建议url #}
+    var suggest_url = "{% url "suggest" %}"
+{# 搜索 #}
+    var search_url = "{% url "search" %}"
+
+{# 点击标签栏切换事件监听->修改当前选中标签 #}
+	$('.searchList').on('click', '.searchItem', function(){
+		$('.searchList .searchItem').removeClass('current');
+		$(this).addClass('current');
+	});
+
+{# 移除数组里制定值的元素 #}
+    function removeByValue(arr, val) {
+      for(var i=0; i<arr.length; i++) {
+        if(arr[i] == val) {
+          arr.splice(i, 1);
+          break;
+        }
+      }
+    }
+
+{# 搜索建议 #}
+    $(function(){
+{# 搜索输入框绑定输入值改变监听事件 #}
+        $('.searchInput').bind(' input propertychange ',function(){
+            {# 获取当前输入框的值 #}
+            var searchText = $(this).val();
+            {# $(".searchItem.current").attr('data-type') 获取选项卡当前选中选项的自定义data-type属性 #}
+            var search_type = $(".searchItem.current").attr('data-type');
+            {# 定义搜索建议html结构体 #}
+            var tmpHtml = ""
+            {# 执行ajax异步请求 #}
+            $.ajax({
+                cache: false,
+                type: 'get',
+                dataType:'json',
+                url:suggest_url+"?s="+searchText+"&s_type="+search_type,
+                async: true,
+                success: function(data) {
+                    {# 拼接返回结果字符串成搜索建议html结构体#}
+                    for (var i=0;i<data.length;i++){
+                        tmpHtml += '<li><a href="'+search_url+'?q='+data[i]+'&s_type='+search_type+'">'+data[i]+'</a></li>';
+                    }
+                    {# 清空原搜索建议列表信息 #}
+                    $(".dataList").html("");
+                    {# 设置新搜索建议列表信息 #}
+                    $(".dataList").append(tmpHtml);
+                    {# 如果返回结果集条数为0，则隐藏搜索建议，否则显示 #}
+                    if (data.length == 0){
+                        $('.dataList').hide()
+                    }else {
+                        $('.dataList').show()
+                    }
+                }
+            });
+        } );
+    })
+
+    hideElement($('.dataList'), $('.searchInput'),$('.resultTotal'));
+
+</script>
+
+<script type="text/javascript">
+
+{# 左侧收起打开栏 #}
+	$('.sideBarShowHide a').click(function(e) {
+		if($('#main').hasClass('sideBarHide')){
+			$('#main').removeClass('sideBarHide');
+			$('#container').removeClass('sideBarHide');
+		}else{
+			$('#main').addClass('sideBarHide');
+			$('#container').addClass('sideBarHide');
+		}
+
+    });
+
+{# 获取本次搜索参数 #}
+	var key_words = "{{ key_words }}"
+{# 分页栏插件 #}
+	$(".pagination").pagination({{ total_nums }}, {
+        {# 当前页码 #}
+		current_page :{{ page|add:'-1' }},
+        {# 每页条数 #}
+		items_per_page :10,
+        {# 显示跳转提示 #}
+		display_msg :true,
+        {# 点击页码回调函数 #}
+		callback :pageselectCallback
+	});
+{# 点击页码回调函数 #}
+	function pageselectCallback(page_id, jq) {
+        {#	访问后台搜索引擎接口 #}
+		window.location.href=search_url+'?q='+key_words+'&s_type='+$(".searchItem.current").attr('data-type')+'&p='+(page_id+1)
+	}
+
+{#	设置高度 #}
+	setHeight();
+	$(window).resize(function(){
+		setHeight();
+	});
+
+	function setHeight(){
+		if($('#container').outerHeight() < $(window).height()){
+			$('#container').height($(window).height()-33);
+		}
+	}
+</script>
+<script type="text/javascript">
+
+{# 联想下拉显示隐藏 #}
+    $('.searchInput').on('focus', function(){
+        $('.dataList').show()
+    });
+
+{# 联想下拉点击 #}
+    $('.dataList').on('click', 'li', function(){
+        var text = $(this).text();
+        $('.searchInput').val(text);
+        $('.dataList').hide()
+    });
+
+</script>
+<script>
+    var searchArr;
+    {#  定义一个search的，判断浏览器有无数据存储（搜索历史）#}
+    if(localStorage.search){
+        {#  如果有，转换成 数组的形式存放到searchArr的数组里（localStorage以字符串的形式存储，所以要把它转换成数组的形式）#}
+        searchArr= localStorage.search.split(",")
+    }else{
+        {# 如果没有，则定义searchArr为一个空的数组#}
+        searchArr = [];
+    }
+    {# 把存储的数据显示出来作为搜索历史#}
+    MapSearchArr();
+
+    {# 点击搜索按钮监听事件（添加本地缓存并访问后台搜索接口） #}
+    function add_search(){
+        var val = $(".searchInput").val();
+        if (val.length>=2){
+            {# 点击搜索按钮时，去重 #}
+            KillRepeat(val);
+            {# 去重后把数组存储到浏览器localStorage #}
+            localStorage.search = searchArr;
+            {# 然后再把搜索内容显示出来 #}
+            MapSearchArr();
+        }
+        window.location.href=search_url+'?q='+val+"&s_type="+$(".searchItem.current").attr('data-type')
+    }
+
+{# 将本地缓存的值显示出来 #}
+    function MapSearchArr(){
+{# 定义本地缓存html结构体 #}
+        var tmpHtml = "";
+{# 数组大小，控制最大为5（最多只显示最近的5条搜索记录） #}
+        var arrLen = 0
+        if (searchArr.length >= 5){
+            arrLen = 5
+        }else {
+            arrLen = searchArr.length
+        }
+{# 拼接本地缓存html #}
+        for (var i=0;i<arrLen;i++){
+            tmpHtml += '<li><a href="'+search_url+'?q='+searchArr[i]+'">'+searchArr[i]+'</a></li>'
+        }
+{# 渲染到页面元素 #}
+      $(".mysearch .all-search").html(tmpHtml)
+    }
+{# 本地搜索缓存去重 #}
+    function KillRepeat(val){
+        var kill = 0;
+        for (var i=0;i<searchArr.length;i++){
+            if(val===searchArr[i]){
+                kill ++;
+            }
+        }
+        if(kill<1){
+{# unshift() 方法可向数组的开头添加一个或更多元素，并返回新的长度。#}
+            searchArr.unshift(val);
+        }else {
+            removeByValue(searchArr, val)
+            searchArr.unshift(val)
+        }
+    }
+</script>
+</html>
